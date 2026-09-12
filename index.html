@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reproductor de Música Avanzado</title>
+    <style>
+        :root {
+            --primary-color: #1db954;
+            --bg-color: #121212;
+            --surface-color: #282828;
+            --text-main: #ffffff;
+            --text-secondary: #b3b3b3;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .player-container {
+            background-color: var(--surface-color);
+            border-radius: 20px;
+            padding: 30px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* Carátula */
+        .cover-art {
+            width: 250px;
+            height: 250px;
+            border-radius: 15px;
+            object-fit: cover;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+            margin-bottom: 20px;
+            transition: transform 0.3s ease;
+        }
+        .cover-art.playing {
+            transform: scale(1.02);
+        }
+
+        /* Información de la canción */
+        .song-info {
+            text-align: center;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        .song-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .song-artist {
+            font-size: 1rem;
+            color: var(--text-secondary);
+        }
+
+        /* Contenedor de Letras (Lyrics) */
+        .lyrics-container {
+            width: 100%;
+            height: 80px;
+            overflow-y: hidden;
+            text-align: center;
+            margin-bottom: 20px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .lyric-line {
+            font-size: 0.95rem;
+            color: var(--text-secondary);
+            transition: color 0.3s ease, font-size 0.3s ease;
+            position: absolute;
+            width: 100%;
+            opacity: 0;
+            pointer-events: none;
+        }
+        .lyric-line.active {
+            color: var(--primary-color);
+            font-size: 1.1rem;
+            font-weight: bold;
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Barra de Progreso */
+        .progress-container {
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        .time-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-bottom: 5px;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background-color: #404040;
+            border-radius: 3px;
+            outline: none;
+            -webkit-appearance: none;
+            cursor: pointer;
+        }
+        .progress-bar::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: var(--primary-color);
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        .progress-bar::-webkit-slider-thumb:hover {
+            transform: scale(1.3);
+        }
+
+        /* Controles */
+        .controls {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 80%;
+        }
+        .btn {
+            background: none;
+            border: none;
+            color: var(--text-main);
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: color 0.2s ease, transform 0.2s ease;
+        }
+        .btn:hover {
+            color: var(--primary-color);
+            transform: scale(1.1);
+        }
+        .btn-play {
+            background-color: var(--primary-color);
+            color: white;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2rem;
+            box-shadow: 0 4px 10px rgba(29, 185, 84, 0.4);
+        }
+        .btn-play:hover {
+            transform: scale(1.05);
+            background-color: #1ed760;
+            color: white;
+        }
+    </style>
+    <!-- Incluir iconos de FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+    <div class="player-container">
+        <!-- Audio nativo oculto -->
+        <audio id="audio"></audio>
+
+        <img id="cover" class="cover-art" src="https://via.placeholder.com/250x250/282828/ffffff?text=Cargando..." alt="Cover">
+        
+        <div class="song-info">
+            <h2 id="title" class="song-title">Cargando...</h2>
+            <h3 id="artist" class="song-artist"></h3>
+        </div>
+
+        <!-- Letras sincronizadas -->
+        <div id="lyrics" class="lyrics-container">
+            <!-- Las letras se inyectarán aquí -->
+            <p class="lyric-line active">Buscando letra...</p>
+        </div>
+
+        <!-- Barra de progreso -->
+        <div class="progress-container">
+            <div class="time-info">
+                <span id="current-time">0:00</span>
+                <span id="duration">0:00</span>
+            </div>
+            <input type="range" id="progress" class="progress-bar" value="0" min="0" max="100" step="0.1">
+        </div>
+
+        <!-- Controles de reproducción -->
+        <div class="controls">
+            <button id="prev" class="btn"><i class="fas fa-step-backward"></i></button>
+            <button id="play-pause" class="btn btn-play"><i class="fas fa-play" id="play-icon"></i></button>
+            <button id="next" class="btn"><i class="fas fa-step-forward"></i></button>
+        </div>
+    </div>
+
+    <script>
+        // --- Lista de canciones (Tu estructura) ---
+        const songs = [
+            {
+                name: "Una Mujer Como Tú",
+                artist: "Eddie Santiago",
+                audioSrc: "https://raw.githubusercontent.com/roynercodex/Playlist-paola/main/Una Mujer Como Tú (1)(2).mp3",
+                lyricsFile: "Una Mujer Como Tú.lrc", // Asegúrate de tener este archivo localmente o usa URL completa
+                coverImage: "Albums/Una mujer mujer como tu.png" // Asegúrate de tener esta ruta
+            },
+            // Puedes agregar más canciones aquí siguiendo el mismo formato
+            // { name: "...", artist: "...", audioSrc: "...", lyricsFile: "...", coverImage: "..." }
+        ];
+
+        // --- Variables DOM ---
+        const audio = document.getElementById("audio");
+        const cover = document.getElementById("cover");
+        const title = document.getElementById("title");
+        const artist = document.getElementById("artist");
+        const playBtn = document.getElementById("play-pause");
+        const playIcon = document.getElementById("play-icon");
+        const prevBtn = document.getElementById("prev");
+        const nextBtn = document.getElementById("next");
+        const progress = document.getElementById("progress");
+        const currentTimeEl = document.getElementById("current-time");
+        const durationEl = document.getElementById("duration");
+        const lyricsContainer = document.getElementById("lyrics");
+
+        let songIndex = 0;
+        let isPlaying = false;
+        let parsedLyrics = []; // Guardará el array de { time, text } del LRC
+
+        // --- Inicialización ---
+        loadSong(songs[songIndex]);
+
+        // Cargar Canción
+        function loadSong(song) {
+            title.textContent = song.name;
+            artist.textContent = song.artist;
+            audio.src = song.audioSrc;
+            
+            // Imagen de fallback por si la ruta no existe (para pruebas)
+            cover.src = song.coverImage;
+            cover.onerror = () => { cover.src = "https://via.placeholder.com/250x250/282828/1db954?text=Sin+Portada" };
+
+            // Cargar archivo LRC
+            fetchLyrics(song.lyricsFile);
+        }
+
+        // --- Lógica del Lector .lrc ---
+        async function fetchLyrics(url) {
+            lyricsContainer.innerHTML = '<p class="lyric-line active">Cargando letra...</p>';
+            parsedLyrics = [];
+            
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error("No se encontró el archivo LRC");
+                
+                const lrcText = await response.text();
+                parseLRC(lrcText);
+            } catch (error) {
+                lyricsContainer.innerHTML = '<p class="lyric-line active">Letra no disponible</p>';
+            }
+        }
+
+        function parseLRC(lrcText) {
+            const lines = lrcText.split('\n');
+            const timeRegex = /\[(\d{2}):(\d{2}\.\d{2,3})\](.*)/;
+            
+            parsedLyrics = [];
+            lyricsContainer.innerHTML = ''; // Limpiar contenedor
+
+            lines.forEach(line => {
+                const match = timeRegex.exec(line);
+                if (match) {
+                    const minutes = parseInt(match[1]);
+                    const seconds = parseFloat(match[2]);
+                    const text = match[3].trim();
+                    
+                    if (text !== "") {
+                        const timeInSeconds = (minutes * 60) + seconds;
+                        parsedLyrics.push({ time: timeInSeconds, text: text });
+                        
+                        // Crear elemento en el DOM
+                        const p = document.createElement('p');
+                        p.className = 'lyric-line';
+                        p.innerText = text;
+                        p.dataset.time = timeInSeconds;
+                        lyricsContainer.appendChild(p);
+                    }
+                }
+            });
+
+            if(parsedLyrics.length === 0) {
+                lyricsContainer.innerHTML = '<p class="lyric-line active">Archivo LRC sin formato válido</p>';
+            }
+        }
+
+        // Actualizar letras en tiempo real
+        function syncLyrics(currentTime) {
+            if (parsedLyrics.length === 0) return;
+
+            let currentLineIndex = -1;
+            
+            // Encontrar la línea actual basado en el tiempo
+            for (let i = 0; i < parsedLyrics.length; i++) {
+                if (currentTime >= parsedLyrics[i].time) {
+                    currentLineIndex = i;
+                } else {
+                    break;
+                }
+            }
+
+            // Actualizar clases CSS
+            const lines = lyricsContainer.querySelectorAll('.lyric-line');
+            lines.forEach((line, index) => {
+                if (index === currentLineIndex) {
+                    line.classList.add('active');
+                } else {
+                    line.classList.remove('active');
+                }
+            });
+        }
+
+        // --- Controles de Reproducción ---
+        function playSong() {
+            isPlaying = true;
+            playIcon.classList.replace("fa-play", "fa-pause");
+            cover.classList.add("playing");
+            audio.play();
+        }
+
+        function pauseSong() {
+            isPlaying = false;
+            playIcon.classList.replace("fa-pause", "fa-play");
+            cover.classList.remove("playing");
+            audio.pause();
+        }
+
+        playBtn.addEventListener("click", () => {
+            if (isPlaying) {
+                pauseSong();
+            } else {
+                playSong();
+            }
+        });
+
+        // Anterior y Siguiente
+        function prevSong() {
+            songIndex--;
+            if (songIndex < 0) songIndex = songs.length - 1;
+            loadSong(songs[songIndex]);
+            if (isPlaying) playSong();
+        }
+
+        function nextSong() {
+            songIndex++;
+            if (songIndex > songs.length - 1) songIndex = 0;
+            loadSong(songs[songIndex]);
+            if (isPlaying) playSong();
+        }
+
+        prevBtn.addEventListener("click", prevSong);
+        nextBtn.addEventListener("click", nextSong);
+        audio.addEventListener("ended", nextSong);
+
+        // --- Barra de Progreso y Tiempo ---
+        function formatTime(seconds) {
+            const min = Math.floor(seconds / 60);
+            let sec = Math.floor(seconds % 60);
+            if (sec < 10) sec = `0${sec}`;
+            return `${min}:${sec}`;
+        }
+
+        // Al cargar los metadatos del audio
+        audio.addEventListener("loadedmetadata", () => {
+            progress.max = audio.duration;
+            durationEl.textContent = formatTime(audio.duration);
+        });
+
+        // Al avanzar el audio
+        audio.addEventListener("timeupdate", () => {
+            const currentTime = audio.currentTime;
+            progress.value = currentTime;
+            currentTimeEl.textContent = formatTime(currentTime);
+            
+            // Sincronizar letra
+            syncLyrics(currentTime);
+        });
+
+        // Al arrastrar/clickear la barra de progreso
+        progress.addEventListener("input", (e) => {
+            audio.currentTime = e.target.value;
+        });
+
+    </script>
+</body>
+</html>
